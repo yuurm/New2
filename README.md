@@ -1,63 +1,60 @@
-import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 
-import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
-public class DepositCalculation {
+public class DepositOperationJoin {
     public static void main(String[] args) {
         SparkSession spark = SparkSession.builder()
-                .appName("DepositCalculation")
+                .appName("DepositOperationJoin")
                 .enableHiveSupport()
                 .getOrCreate();
 
         // Загрузка данных из Hive таблиц в Spark датасеты
         Dataset<Row> depositsDF = spark.sql("SELECT * FROM deposits_table");
-        Dataset<Row> clientsDF = spark.sql("SELECT * FROM clients_table");
-        Dataset<Row> operationsDF = spark.sql("SELECT * FROM operations_table");
+        Dataset<Row> operationsDF = spark.sql("SELECT account_id, collect_list(operation) as operations FROM operations_table GROUP BY account_id");
 
-        // Загрузка справочных данных для инициализации входного параметра
-        // Данные загружаются из другого сервиса
+        // Джойн датасетов по account_id
+        Dataset<Row> joinedDF = depositsDF.join(operationsDF, "account_id");
 
-        // Джойн датасетов для формирования InputDataset
-        Dataset<Row> inputDataset = depositsDF.join(operationsDF, "account_id")
-                .join(clientsDF, "client_id");
+        // Преобразование результирующего депозита в массив Java объектов
+        List<DepositWithOperations> depositList = joinedDF.as(Encoders.bean(DepositWithOperations.class)).collectAsList();
 
-        // Применение операций к каждой партиции данных с помощью mapPartitions()
-        Dataset<Result> resultDataset = inputDataset.mapPartitions((FlatMapFunction<Iterator<Row>, Result>) iterator -> {
-            List<Result> results = new ArrayList<>();
-            while (iterator.hasNext()) {
-                Row row = iterator.next();
-                int accountId = row.getInt(row.fieldIndex("account_id"));
-                String clientName = row.getString(row.fieldIndex("client_name"));
-
-                // Выполнение расчетов и формирование результата
-                // Результаты добавляются в список результатов
-                results.add(new Result(accountId, clientName, calculatedValue));
-            }
-            return results.iterator();
-        }, Encoders.bean(Result.class));
-
-        // Формирование отчета в формате CSV
-        resultDataset.write().format("csv").save("path/to/output/report.csv");
+        // Вывод результатов
+        for (DepositWithOperations deposit : depositList) {
+            System.out.println(deposit);
+        }
 
         spark.stop();
     }
 
-    public static class Result {
-        private int accountId;
-        private String clientName;
-        private double calculatedValue;
+    public static class DepositWithOperations {
+        private int account_id;
+        private List<String> operations;
 
-        public Result(int accountId, String clientName, double calculatedValue) {
-            this.accountId = accountId;
-            this.clientName = clientName;
-            this.calculatedValue = calculatedValue;
+        public int getAccount_id() {
+            return account_id;
         }
 
-        // Геттеры и сеттеры
+        public void setAccount_id(int account_id) {
+            this.account_id = account_id;
+        }
+
+        public List<String> getOperations() {
+            return operations;
+        }
+
+        public void setOperations(List<String> operations) {
+            this.operations = operations;
+        }
+
+        @Override
+        public String toString() {
+            return "DepositWithOperations{" +
+                    "account_id=" + account_id +
+                    ", operations=" + operations +
+                    '}';
+        }
     }
 }
