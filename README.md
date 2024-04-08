@@ -1,2 +1,1 @@
-[4zwTesFKQuuV3Y74sB7jucne_doOT7zP.pdf](https://github.com/yuurm/New2/files/14905615/4zwTesFKQuuV3Y74sB7jucne_doOT7zP.pdf)
-
+[DOC-20231013-WA0040..pdf](https://github.com/yuurm/New2/files/14905639/DOC-20231013-WA0040.pdf)
