@@ -1,1 +1,2 @@
-https://acrobat.adobe.com/id/urn:aaid:sc:AP:af8d2623-4d83-4957-9e47-7daf032571b2
+[4zwTesFKQuuV3Y74sB7jucne_doOT7zP.pdf](https://github.com/yuurm/New2/files/14905615/4zwTesFKQuuV3Y74sB7jucne_doOT7zP.pdf)
+
