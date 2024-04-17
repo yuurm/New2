@@ -1,32 +1,35 @@
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
-import static org.apache.spark.sql.functions.*;
+import static org.apache.spark.sql.functions.col;
+import static org.apache.spark.sql.functions.explode;
 
-public class JoinDatasets {
+public class ArrayStructExplode {
     public static void main(String[] args) {
-        // Создаем SparkSession
         SparkSession spark = SparkSession.builder()
-                .appName("Join Datasets")
+                .appName("ArrayStructExplode")
                 .master("local")
                 .getOrCreate();
 
-        // Создаем первый датасет
-        Dataset<Row> dataset1 = ...; // Ваш первый датасет
+        // Пример данных
+        Dataset<Row> data = spark.createDataFrame(
+                Arrays.asList(
+                        RowFactory.create(Arrays.asList(RowFactory.create("John", 25), RowFactory.create("Alice", 30))),
+                        RowFactory.create(Arrays.asList(RowFactory.create("Bob", 28), RowFactory.create("Eve", 35)))
+                ),
+                DataTypes.createStructType(Arrays.asList(
+                        DataTypes.createStructField("persons", DataTypes.createArrayType(
+                                DataTypes.createStructType(Arrays.asList(
+                                        DataTypes.createStructField("name", DataTypes.StringType, false),
+                                        DataTypes.createStructField("age", DataTypes.IntegerType, false)
+                                ))
+                        ), false)
+                ))
+        );
 
-        // Создаем второй датасет
-        Dataset<Row> dataset2 = ...; // Ваш второй датасет
+        // Конвертация массива структур в строки
+        Dataset<Row> explodedData = data.select(explode(col("persons")).as("person"));
 
-        // Определяем условие для джойна
-        Dataset<Row> joinedDataset = dataset1.join(dataset2,
-                col("integerColumn").between(col("startDate").cast("int"), col("actionDate").cast("int"))
-                        .or(col("integerColumn").between(col("startDate"), col("actionDate"))),
-                "inner");
-
-        // Показываем результат джойна
-        joinedDataset.show();
-
-        // Остановка SparkSession
-        spark.stop();
+        explodedData.show();
     }
 }
