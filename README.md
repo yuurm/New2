@@ -1,35 +1,16 @@
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
-import org.apache.spark.sql.SparkSession;
-import static org.apache.spark.sql.functions.col;
-import static org.apache.spark.sql.functions.explode;
+import static org.apache.spark.sql.functions.*;
 
-public class ArrayStructExplode {
-    public static void main(String[] args) {
-        SparkSession spark = SparkSession.builder()
-                .appName("ArrayStructExplode")
-                .master("local")
-                .getOrCreate();
+Dataset<Row> yourDataset = // ваш датасет
 
-        // Пример данных
-        Dataset<Row> data = spark.createDataFrame(
-                Arrays.asList(
-                        RowFactory.create(Arrays.asList(RowFactory.create("John", 25), RowFactory.create("Alice", 30))),
-                        RowFactory.create(Arrays.asList(RowFactory.create("Bob", 28), RowFactory.create("Eve", 35)))
-                ),
-                DataTypes.createStructType(Arrays.asList(
-                        DataTypes.createStructField("persons", DataTypes.createArrayType(
-                                DataTypes.createStructType(Arrays.asList(
-                                        DataTypes.createStructField("name", DataTypes.StringType, false),
-                                        DataTypes.createStructField("age", DataTypes.IntegerType, false)
-                                ))
-                        ), false)
-                ))
-        );
+yourDataset = yourDataset.withColumn("new_date_column",
+    when(col("date_of_payment").isNotNull().and(col("date_of_opening").isNull().or(col("date_of_opening").lt(col("date_of_payment"))).and(col("start_date").isNull().or(col("start_date").lt(col("date_of_payment")))),
+        col("date_of_payment"))
+    .when(col("date_of_opening").isNotNull().and(col("date_of_payment").isNull().or(col("date_of_payment").lt(col("date_of_opening"))).and(col("start_date").isNull().or(col("start_date").lt(col("date_of_opening")))),
+        col("date_of_opening"))
+    .otherwise(col("start_date"))
+    .cast("date")
+);
 
-        // Конвертация массива структур в строки
-        Dataset<Row> explodedData = data.select(explode(col("persons")).as("person"));
-
-        explodedData.show();
-    }
-}
+yourDataset.show();
