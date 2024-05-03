@@ -1,16 +1,45 @@
-import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.Row;
-import static org.apache.spark.sql.functions.*;
+Для решения данной задачи вам потребуется использовать библиотеку Apache POI для работы с Excel файлами в Java. Вот пример кода, который считывает первую и вторую колонки из Excel файла, находит совпадающие подстроки и выводит их в требуемом формате:
 
-Dataset<Row> yourDataset = // ваш датасет
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
-yourDataset = yourDataset.withColumn("new_date_column",
-    when(col("date_of_payment").isNotNull().and(col("date_of_opening").isNull().or(col("date_of_opening").lt(col("date_of_payment"))).and(col("start_date").isNull().or(col("start_date").lt(col("date_of_payment")))),
-        col("date_of_payment"))
-    .when(col("date_of_opening").isNotNull().and(col("date_of_payment").isNull().or(col("date_of_payment").lt(col("date_of_opening"))).and(col("start_date").isNull().or(col("start_date").lt(col("date_of_opening")))),
-        col("date_of_opening"))
-    .otherwise(col("start_date"))
-    .cast("date")
-);
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 
-yourDataset.show();
+public class ExcelReader {
+
+    public static void main(String[] args) {
+        try {
+            FileInputStream file = new FileInputStream(new File("example.xlsx"));
+            Workbook workbook = new XSSFWorkbook(file);
+            Sheet sheet = workbook.getSheetAt(0);
+
+            for (Row row : sheet) {
+                Cell cell1 = row.getCell(0);
+                Cell cell2 = row.getCell(1);
+
+                if (cell1 != null && cell2 != null) {
+                    String value1 = cell1.getStringCellValue();
+                    String value2 = cell2.getStringCellValue();
+
+                    for (String substring1 : value1.split(",")) {
+                        for (String substring2 : value2.split(",")) {
+                            if (substring1.trim().equals(substring2.trim())) {
+                                System.out.println("col(" + substring1.trim() + "),\ncol(" + substring2.trim() + ")");
+                            }
+                        }
+                    }
+                }
+            }
+
+            workbook.close();
+            file.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+
+Пожалуйста, убедитесь, что у вас есть файл "example.xlsx" с данными, которые соответствуют вашему описанию. Этот код считывает Excel файл, обрабатывает данные и выводит результат в требуемом формате.
