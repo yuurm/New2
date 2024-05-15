@@ -1,45 +1,37 @@
-Для решения данной задачи вам потребуется использовать библиотеку Apache POI для работы с Excel файлами в Java. Вот пример кода, который считывает первую и вторую колонки из Excel файла, находит совпадающие подстроки и выводит их в требуемом формате:
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SparkSession;
 
-import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-
-public class ExcelReader {
+public class CheckColumnNames {
 
     public static void main(String[] args) {
-        try {
-            FileInputStream file = new FileInputStream(new File("example.xlsx"));
-            Workbook workbook = new XSSFWorkbook(file);
-            Sheet sheet = workbook.getSheetAt(0);
+        SparkSession spark = SparkSession.builder()
+                .appName("Check Column Names")
+                .getOrCreate();
 
-            for (Row row : sheet) {
-                Cell cell1 = row.getCell(0);
-                Cell cell2 = row.getCell(1);
+        // Загрузка вашего датасета
+        Dataset<Row> df = spark.read().format("csv").option("header", "true").load("путь_к_вашему_файлу.csv");
 
-                if (cell1 != null && cell2 != null) {
-                    String value1 = cell1.getStringCellValue();
-                    String value2 = cell2.getStringCellValue();
+        // Получение списка всех названий колонок
+        String[] allColumns = df.columns();
 
-                    for (String substring1 : value1.split(",")) {
-                        for (String substring2 : value2.split(",")) {
-                            if (substring1.trim().equals(substring2.trim())) {
-                                System.out.println("col(" + substring1.trim() + "),\ncol(" + substring2.trim() + ")");
-                            }
-                        }
-                    }
-                }
+        // Названия колонок, которые вы хотите проверить
+        String[] requiredColumns = {"column1", "column2", "arrayColumn.field1", "arrayColumn.field2"};
+
+        // Проверка наличия каждого из требуемых названий колонок
+        for (String column : requiredColumns) {
+            if (!containsColumn(allColumns, column)) {
+                System.out.println("Отсутствует требуемая колонка: " + column);
             }
-
-            workbook.close();
-            file.close();
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
+
+    private static boolean containsColumn(String[] columns, String columnName) {
+        for (String column : columns) {
+            if (column.equals(columnName)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
-
-
-Пожалуйста, убедитесь, что у вас есть файл "example.xlsx" с данными, которые соответствуют вашему описанию. Этот код считывает Excel файл, обрабатывает данные и выводит результат в требуемом формате.
