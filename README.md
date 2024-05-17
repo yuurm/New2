@@ -1,37 +1,30 @@
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.expressions.Window;
+import org.apache.spark.sql.expressions.WindowSpec;
+import static org.apache.spark.sql.functions.*;
+import org.apache.spark.sql.expressions.WindowSpec;
 
-public class CheckColumnNames {
-
+public class Main {
     public static void main(String[] args) {
         SparkSession spark = SparkSession.builder()
-                .appName("Check Column Names")
+                .appName("PartitionAndFindPreviousRecord")
                 .getOrCreate();
 
-        // Загрузка вашего датасета
-        Dataset<Row> df = spark.read().format("csv").option("header", "true").load("путь_к_вашему_файлу.csv");
+        // Загрузка датасета
+        Dataset<Row> dataset = spark.read().csv("путь_к_вашему_файлу.csv");
 
-        // Получение списка всех названий колонок
-        String[] allColumns = df.columns();
+        // Определение окна для партиционирования
+        WindowSpec windowSpec = Window.partitionBy("деп_м", "деп_н").orderBy(col("целочисленная_колонка"));
 
-        // Названия колонок, которые вы хотите проверить
-        String[] requiredColumns = {"column1", "column2", "arrayColumn.field1", "arrayColumn.field2"};
+        // Добавление колонки с предыдущим значением
+        Dataset<Row> result = dataset.withColumn("предыдущее_значение",
+                lag(col("целочисленная_колонка"), 1).over(windowSpec));
 
-        // Проверка наличия каждого из требуемых названий колонок
-        for (String column : requiredColumns) {
-            if (!containsColumn(allColumns, column)) {
-                System.out.println("Отсутствует требуемая колонка: " + column);
-            }
-        }
-    }
+        // Вывод результата
+        result.show();
 
-    private static boolean containsColumn(String[] columns, String columnName) {
-        for (String column : columns) {
-            if (column.equals(columnName)) {
-                return true;
-            }
-        }
-        return false;
+        spark.stop();
     }
 }
