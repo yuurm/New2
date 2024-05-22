@@ -59,3 +59,25 @@ public class AutoIncrementPrimaryKey {
 In this example, we create a Dataset<Student> with sample data. We then define a custom function addAutoIncrementPrimaryKey() that uses the monotonicallyIncreasingId() function from org.apache.spark.sql.functions to generate unique IDs for each row. This function adds a new column "id" with auto-incrementing values to the dataset.
 
 By using the monotonicallyIncreasingId() function, you can simulate auto-increment functionality in Spark for generating unique primary key values in a dataset.
+import org.apache.spark.sql.Row;
+import scala.collection.JavaConverters;
+import scala.collection.Seq;
+
+public class RowToArrayConverter {
+
+    public static void main(String[] args) {
+        // Assuming you have a Row object named 'row' obtained from a DataFrame
+        Row row = ...; // Obtain the Row object from your DataFrame
+
+        // Convert Row to a Seq
+        Seq<Object> rowSeq = row.toSeq();
+
+        // Convert Seq to a Java array
+        Object[] dataArray = JavaConverters.seqAsJavaList(rowSeq).toArray();
+
+        // Now you have the data from the Row in a Java array
+        for (Object data : dataArray) {
+            System.out.println(data);
+        }
+    }
+}
