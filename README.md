@@ -1,4 +1,14 @@
-In Apache Spark, there isn't a built-in auto-increment feature like in traditional databases. However, you can simulate auto-increment functionality by creating a custom sequence and using it to generate unique IDs for your primary key field. Here's an example of how you can achieve this in Spark using a custom function:
+   import scala.collection.JavaConverters;
+   import scala.collection.mutable.Buffer;
+
+   // Assuming you have a Java ArrayList named javaList
+   ArrayList<String> javaList = new ArrayList<>();
+   javaList.add("item1");
+   javaList.add("item2");
+
+   Buffer<String> buffer = JavaConverters.asScalaBuffer(javaList);
+   scala.collection.mutable.List<String> scalaList = buffer.toList();
+   by creating a custom sequence and using it to generate unique IDs for your primary key field. Here's an example of how you can achieve this in Spark using a custom function:
 
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
