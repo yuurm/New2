@@ -325,3 +325,56 @@ class SerializableResultType implements Serializable {
 Использование DTO внутри MapFunction: Вы используете DTO объекты внутри MapFunction, преобразовывая их обратно в оригинальные объекты и выполняя необходимые операции.
 
 Этот подход позволяет вам обойти ограничения сериализации, обеспечивая при этом возможность выполнения нужных операций в Spark.
+import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
+
+public class CustomObject {
+    private int id;
+    private String name;
+
+    public CustomObject(int id, String name) {
+        this.id = id;
+        this.name = name;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public static void main(String[] args) {
+        SparkSession spark = SparkSession.builder()
+                .appName("CustomObjectToRowConversion")
+                .getOrCreate();
+
+        // Create dataset of custom objects
+        Dataset<CustomObject> customObjectDataset = spark.createDataset(
+                Arrays.asList(new CustomObject(1, "Alice"), new CustomObject(2, "Bob")),
+                Encoders.bean(CustomObject.class)
+        );
+
+        // Convert custom objects to rows
+        Dataset<Row> rowDataset = customObjectDataset.map(customObject -> RowFactory.create(customObject.getId(), customObject.getName()), Encoders.bean(Row.class));
+
+        // Define schema for the rows
+        StructType schema = DataTypes.createStructType(new StructField[]{
+                DataTypes.createStructField("id", DataTypes.IntegerType, false),
+                DataTypes.createStructField("name", DataTypes.StringType, false)
+        });
+
+        // Create dataset of rows
+        Dataset<Row> rowDatasetWithSchema = spark.createDataFrame(rowDataset.rdd(), schema);
+
+        rowDatasetWithSchema.show();
+        
+        spark.stop();
+    }
+}
