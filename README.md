@@ -1,88 +1,213 @@
-import com.github.javaparser.StaticJavaParser;
-import com.github.javaparser.ast.CompilationUnit;
-import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
-import com.github.javaparser.ast.body.MethodDeclaration;
-import com.github.javaparser.ast.body.VariableDeclarator;
-import com.github.javaparser.ast.expr.StringLiteralExpr;
-import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
+Для реализации указанных требований в Spring Boot приложении с использованием конфигурационных карт (ConfigMap) в OpenShift, можно следовать следующему плану:
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.HashSet;
-import java.util.Set;
+### Шаги реализации
 
-public class CodeAnalyzer {
+#### 1. Создание конфигурационного блока для путей и типов ТК
 
-    private static final String PROJECT_DIR = "path/to/your/project";
+Создайте ConfigMap в OpenShift для хранения соответствий между путями и типами технологий. 
 
-    public static void main(String[] args) throws IOException {
-        Set<String> fileReferences = new HashSet<>();
-        Set<String> classes = new HashSet<>();
-        Set<String> usedClasses = new HashSet<>();
+##### Пример ConfigMap:
 
-        Files.walk(Paths.get(PROJECT_DIR))
-                .filter(Files::isRegularFile)
-                .filter(path -> path.toString().endsWith(".java"))
-                .forEach(path -> {
-                    try {
-                        CompilationUnit cu = StaticJavaParser.parse(path);
-                        cu.accept(new FileReferenceCollector(), fileReferences);
-                        cu.accept(new ClassCollector(), classes);
-                        cu.accept(new UsedClassCollector(), usedClasses);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                });
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: path-to-tk-type-config
+data:
+  path-to-tk-type: |
+    package/bh=Толстый клиент
+    package/configmaps=Конфиг
+```
 
-        System.out.println("File References:");
-        for (String fileReference : fileReferences) {
-            if (!new File(PROJECT_DIR + File.separator + fileReference).exists()) {
-                System.out.println(fileReference + " does not exist.");
-            }
-        }
+##### Примените ConfigMap:
 
-        System.out.println("\nUnused Classes:");
-        for (String cls : classes) {
-            if (!usedClasses.contains(cls)) {
-                System.out.println(cls);
+```bash
+oc apply -f path-to-tk-type-config.yml
+```
+
+#### 2. Обновление Spring Boot приложения для чтения данных из ConfigMap
+
+##### 2.1. Добавьте зависимости в `pom.xml`
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-kubernetes-config</artifactId>
+</dependency>
+```
+
+##### 2.2. Настройка приложения для чтения ConfigMap
+
+Создайте файл `bootstrap.yml` в `src/main/resources`:
+
+```yaml
+spring:
+  cloud:
+    kubernetes:
+      config:
+        name: path-to-tk-type-config
+        namespace: <your-namespace> # Замените на ваш namespace в OpenShift
+        enabled: true
+```
+
+##### 2.3. Создайте класс для чтения и хранения конфигурации
+
+```java
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.stereotype.Component;
+
+import javax.annotation.PostConstruct;
+import java.util.HashMap;
+import java.util.Map;
+
+@Component
+public class PathToTkTypeConfig {
+
+    @Value("${path-to-tk-type}")
+    private String pathToTkTypeString;
+
+    private Map<String, String> pathToTkTypeMap = new HashMap<>();
+
+    @PostConstruct
+    public void init() {
+        String[] mappings = pathToTkTypeString.split("\n");
+        for (String mapping : mappings) {
+            String[] parts = mapping.split("=");
+            if (parts.length == 2) {
+                pathToTkTypeMap.put(parts[0].trim(), parts[1].trim());
             }
         }
     }
 
-    private static class FileReferenceCollector extends VoidVisitorAdapter<Set<String>> {
-        @Override
-        public void visit(StringLiteralExpr n, Set<String> collector) {
-            String value = n.getValue();
-            if (value.matches(".*\\.(txt|csv|xml|json|properties)")) {
-                collector.add(value);
+    public String getTkTypeForPath(String path) {
+        return pathToTkTypeMap.get(path);
+    }
+}
+```
+
+#### 3. Разбор SBOM и анализ блока `files`
+
+##### 3.1. Создайте сервис для разбора SBOM и анализа файлов
+
+```java
+import org.springframework.stereotype.Service;
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class SbomAnalyzerService {
+
+    private final PathToTkTypeConfig pathToTkTypeConfig;
+    private final TechnologyRepository technologyRepository;
+
+    public SbomAnalyzerService(PathToTkTypeConfig pathToTkTypeConfig, TechnologyRepository technologyRepository) {
+        this.pathToTkTypeConfig = pathToTkTypeConfig;
+        this.technologyRepository = technologyRepository;
+    }
+
+    public void analyzeSbom(Sbom sbom) {
+        List<File> files = sbom.getFiles();
+        for (File file : files) {
+            String filePath = file.getPath();
+            Optional<String> optionalTkType = getTkTypeFromPath(filePath);
+            if (optionalTkType.isPresent()) {
+                String tkType = optionalTkType.get();
+                saveOrUpdateTechnologyComponent(tkType, file);
             }
-            super.visit(n, collector);
         }
     }
 
-    private static class ClassCollector extends VoidVisitorAdapter<Set<String>> {
-        @Override
-        public void visit(ClassOrInterfaceDeclaration n, Set<String> collector) {
-            collector.add(n.getNameAsString());
-            super.visit(n, collector);
-        }
+    private Optional<String> getTkTypeFromPath(String path) {
+        return Optional.ofNullable(pathToTkTypeConfig.getTkTypeForPath(path));
     }
 
-    private static class UsedClassCollector extends VoidVisitorAdapter<Set<String>> {
-        @Override
-        public void visit(MethodDeclaration n, Set<String> collector) {
-            n.getBody().ifPresent(body -> body.findAll(ClassOrInterfaceDeclaration.class)
-                    .forEach(cls -> collector.add(cls.getNameAsString())));
-            super.visit(n, collector);
+    private void saveOrUpdateTechnologyComponent(String tkType, File file) {
+        TechnologyComponent existingComponent = technologyRepository.findByName(tkType);
+        if (existingComponent == null) {
+            TechnologyComponent newComponent = new TechnologyComponent();
+            newComponent.setName(tkType);
+            newComponent.setVersion(file.getVersion());
+            newComponent.setSource("SBOM");
+            technologyRepository.save(newComponent);
+        } else {
+            existingComponent.setVersion(file.getVersion());
+            technologyRepository.save(existingComponent);
         }
     }
 }
-<dependencies>
-    <dependency>
-        <groupId>com.github.javaparser</groupId>
-        <artifactId>javaparser-core</artifactId>
-        <version>3.23.0</version>
-    </dependency>
-</dependencies>
+```
+
+##### 3.2. Добавьте модели для SBOM и TechnologyComponent
+
+```java
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+
+@Entity
+public class TechnologyComponent {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String name;
+    private String version;
+    private String source;
+
+    // getters and setters
+}
+
+public class Sbom {
+    private List<File> files;
+
+    // getters and setters
+
+    public static class File {
+        private String path;
+        private String version;
+
+        // getters and setters
+    }
+}
+```
+
+##### 3.3. Создайте репозиторий для TechnologyComponent
+
+```java
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface TechnologyRepository extends JpaRepository<TechnologyComponent, Long> {
+    TechnologyComponent findByName(String name);
+}
+```
+
+#### 4. Обновите контроллер для обработки SBOM
+
+```java
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class SbomController {
+
+    private final SbomAnalyzerService sbomAnalyzerService;
+
+    public SbomController(SbomAnalyzerService sbomAnalyzerService) {
+        this.sbomAnalyzerService = sbomAnalyzerService;
+    }
+
+    @PostMapping("/api/sbom/analyze")
+    public void analyzeSbom(@RequestBody Sbom sbom) {
+        sbomAnalyzerService.analyzeSbom(sbom);
+    }
+}
+```
+
+Таким образом, вы сможете создать универсальный механизм для разбора SBOM, анализа файлов и сопоставления типов технологий на основе конфигурации, хранящейся в OpenShift ConfigMap.
